@@ -5,6 +5,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,67 +19,55 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // Business Exception Handler
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(
             BusinessException ex, WebRequest request) {
-        
+
         ErrorCode errorCode = ex.getErrorCode();
-        
-        // Log based on severity
+        String userMessage = ExceptionMessageResolver.resolve(ex);
+
         if (errorCode.isCritical()) {
-            log.error("CRITICAL Business exception: {} - {}", errorCode.getCode(), ex.getMessage(), ex);
+            log.error("CRITICAL Business exception: {} - {}", errorCode.getCode(), userMessage, ex);
         } else if (errorCode.shouldLog()) {
-            log.warn("Business exception: {} - {}", errorCode.getCode(), ex.getMessage());
+            log.warn("Business exception: {} - {}", errorCode.getCode(), userMessage);
         } else {
-            log.debug("Business exception: {} - {}", errorCode.getCode(), ex.getMessage());
+            log.debug("Business exception: {} - {}", errorCode.getCode(), userMessage);
         }
-        
+
         ErrorDetails errorDetails = ErrorDetails.builder()
                 .code(errorCode.getCode())
-                .details(ex.getDetails())
+                .details(userMessage)
                 .build();
-
-        ApiResponse<Void> response = ApiResponse.error(
-                ex.getMessage(),
-                errorDetails
-        );
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(response);
+                .body(ApiResponse.error(userMessage, errorDetails));
     }
 
-    // Resource Not Found Exception Handler
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(
             ResourceNotFoundException ex, WebRequest request) {
-        
+
         ErrorCode errorCode = ex.getErrorCode();
-        log.debug("Resource not found: {} - {}", errorCode.getCode(), ex.getMessage());
-        
+        String userMessage = ExceptionMessageResolver.resolve(ex);
+        log.debug("Resource not found: {} - {}", errorCode.getCode(), userMessage);
+
         ErrorDetails errorDetails = ErrorDetails.builder()
                 .code(errorCode.getCode())
-                .details(ex.getDetails())
+                .details(userMessage)
                 .build();
-
-        ApiResponse<Void> response = ApiResponse.error(
-                ex.getMessage(),
-                errorDetails
-        );
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(response);
+                .body(ApiResponse.error(userMessage, errorDetails));
     }
 
-    // Validation Exception Handler (@Valid)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(
             MethodArgumentNotValidException ex) {
-        
-        log.error("Validation error: {}", ex.getMessage());
-        
+
+        log.debug("Validation error: {}", ex.getMessage());
+
         Map<String, String> validationErrors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((FieldError) error).getField();
@@ -86,29 +75,28 @@ public class GlobalExceptionHandler {
             validationErrors.put(fieldName, errorMessage);
         });
 
+        String userMessage = ExceptionMessageResolver.firstValidationMessage(
+                validationErrors,
+                "Please check the highlighted fields and try again."
+        );
+
         ErrorDetails errorDetails = ErrorDetails.builder()
                 .code(ErrorCode.VALIDATION_ERROR.getCode())
-                .details("Validation failed for one or more fields")
+                .details(userMessage)
                 .validationErrors(validationErrors)
                 .build();
 
-        ApiResponse<Void> response = ApiResponse.error(
-                ErrorCode.VALIDATION_ERROR.getMessage(),
-                errorDetails
-        );
-
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(response);
+                .body(ApiResponse.error(userMessage, errorDetails));
     }
 
-    // Constraint Violation Exception Handler
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(
             ConstraintViolationException ex) {
-        
-        log.error("Constraint violation: {}", ex.getMessage());
-        
+
+        log.debug("Constraint violation: {}", ex.getMessage());
+
         Map<String, String> validationErrors = new HashMap<>();
         ex.getConstraintViolations().forEach(violation -> {
             String fieldName = violation.getPropertyPath().toString();
@@ -116,64 +104,93 @@ public class GlobalExceptionHandler {
             validationErrors.put(fieldName, errorMessage);
         });
 
+        String userMessage = ExceptionMessageResolver.firstValidationMessage(
+                validationErrors,
+                "Please check the highlighted fields and try again."
+        );
+
         ErrorDetails errorDetails = ErrorDetails.builder()
                 .code(ErrorCode.VALIDATION_ERROR.getCode())
-                .details("Constraint violation")
+                .details(userMessage)
                 .validationErrors(validationErrors)
                 .build();
 
-        ApiResponse<Void> response = ApiResponse.error(
-                ErrorCode.VALIDATION_ERROR.getMessage(),
-                errorDetails
-        );
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(userMessage, errorDetails));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex) {
+
+        log.debug("Malformed request body: {}", ex.getMessage());
+
+        String userMessage = "The request could not be read. Please check your input and try again.";
+        ErrorDetails errorDetails = ErrorDetails.builder()
+                .code(ErrorCode.BAD_REQUEST.getCode())
+                .details(userMessage)
+                .build();
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(response);
+                .body(ApiResponse.error(userMessage, errorDetails));
     }
 
-    // Generic Exception Handler
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGenericException(
-            Exception ex, WebRequest request) {
-        
-        log.error("Unexpected error occurred", ex);
-        
-        ErrorDetails errorDetails = ErrorDetails.builder()
-                .code(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
-                .details("An unexpected error occurred. Please try again later.")
-                .build();
-
-        ApiResponse<Void> response = ApiResponse.error(
-                ErrorCode.INTERNAL_SERVER_ERROR.getMessage(),
-                errorDetails
-        );
-
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(response);
-    }
-
-    // IllegalArgumentException Handler (for backward compatibility)
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
-        
-        log.error("Illegal argument: {}", ex.getMessage());
-        
+
+        log.debug("Illegal argument: {}", ex.getMessage());
+
+        String userMessage = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : ErrorCode.BAD_REQUEST.getMessage();
+
         ErrorDetails errorDetails = ErrorDetails.builder()
                 .code(ErrorCode.BAD_REQUEST.getCode())
-                .details(ex.getMessage())
+                .details(userMessage)
                 .build();
-
-        ApiResponse<Void> response = ApiResponse.error(
-                "Bad Request",
-                errorDetails
-        );
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(response);
+                .body(ApiResponse.error(userMessage, errorDetails));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(
+            IllegalStateException ex, WebRequest request) {
+
+        log.warn("Illegal state: {}", ex.getMessage());
+
+        String userMessage = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : ErrorCode.SERVICE_UNAVAILABLE.getMessage();
+
+        ErrorDetails errorDetails = ErrorDetails.builder()
+                .code(ErrorCode.SERVICE_UNAVAILABLE.getCode())
+                .details(userMessage)
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error(userMessage, errorDetails));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGenericException(
+            Exception ex, WebRequest request) {
+
+        log.error("Unexpected error occurred", ex);
+
+        String userMessage = "Something went wrong on our side. Please try again in a moment.";
+        ErrorDetails errorDetails = ErrorDetails.builder()
+                .code(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
+                .details(userMessage)
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(userMessage, errorDetails));
     }
 }
-
