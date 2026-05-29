@@ -83,9 +83,10 @@ public class MlAnalysisService implements IMlAnalysisService {
 
     /** Generic figurative / idiomatic cues across Turkish social/news language. */
     private static final Set<String> FIGURATIVE_CUES = new HashSet<>(Arrays.asList(
-            "etkisi yarattı", "etkisi yaratti", "etkisi oldu", "gibi", "resmen", "adeta", "adeta bir",
+            "etkisi yarattı", "etkisi yaratti", "etkisi oldu", "gibi", "sanki", "resmen", "adeta", "adeta bir",
             "mecazi", "metafor", "benzetme", "şok etkisi", "sarsıntı yarattı", "sarsinti yaratti",
-            "fırtına estirdi", "firtina estirdi", "siyaset depremi", "piyasa depremi", "transfer depremi"
+            "fırtına estirdi", "firtina estirdi", "siyaset depremi", "piyasa depremi", "transfer depremi",
+            "gözyaşları sel", "gozyaslari sel", "gözyaşı sel", "gozyasi sel", "göz yaşları sel"
     ));
 
     /** Context domains that strongly indicate non-literal usage. */
@@ -156,6 +157,7 @@ public class MlAnalysisService implements IMlAnalysisService {
                 log.info("[ML SERVICE] Message: {}", result.getMessage());
                 log.info("[ML SERVICE] Full response: isDisasterRelated={}, relevanceScore={}, message={}", 
                         result.isDisasterRelated(), result.getRelevanceScore(), result.getMessage());
+                applyFigurativeLanguageGuard(text, result);
                 return result;
             } else {
                 log.error("[ML SERVICE] ❌ ML service returned unsuccessful response: {}", response.getStatusCode());
