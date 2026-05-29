@@ -134,16 +134,14 @@ public class AiBatchAnalysisService {
                             post.setImageAnalyzedAt(Instant.now());
                         }
 
-                        // Keep damage analysis behind relevance threshold.
-                        if (post.getRelevanceScore() != null && post.getRelevanceScore() >= 0.70) {
-                            var damage = openAiVisionMatchService.analyzeImageDamage(post.getMediaUrl());
-                            if (damage != null) {
-                                post.setHasImageDamage((Boolean) damage.get("hasDamage"));
-                                post.setImageDamageSeverity((String) damage.get("damageSeverity"));
-                                post.setImageDamageScore((Double) damage.get("damageScore"));
-                                post.setImageDamageAnalysisJson((String) damage.get("rawJson"));
-                                post.setImageAnalyzedAt(Instant.now());
-                            }
+                        // Run damage analysis whenever media exists.
+                        var damage = openAiVisionMatchService.analyzeImageDamage(post.getMediaUrl());
+                        if (damage != null) {
+                            post.setHasImageDamage((Boolean) damage.get("hasDamage"));
+                            post.setImageDamageSeverity((String) damage.get("damageSeverity"));
+                            post.setImageDamageScore((Double) damage.get("damageScore"));
+                            post.setImageDamageAnalysisJson((String) damage.get("rawJson"));
+                            post.setImageAnalyzedAt(Instant.now());
                         }
                     }
                     postConfidenceAdjustmentService.adjust(post);

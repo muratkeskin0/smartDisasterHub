@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -238,7 +239,21 @@ public class RedditRssFeedService {
             return decodeHtml(stripTags(markdown.group(1))).trim();
         }
 
-        return decodeHtml(stripTags(contentHtml)).trim();
+        String stripped = decodeHtml(stripTags(contentHtml)).trim();
+        if (isRssBoilerplate(stripped)) {
+            return "";
+        }
+        return stripped;
+    }
+
+    /** RSS image/link posts often have no body — only "submitted by … [link] [comments]". */
+    private boolean isRssBoilerplate(String text) {
+        if (text == null || text.isBlank()) {
+            return true;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+        return normalized.matches(".*submitted by.*/u/.*\\[link\\].*\\[comments\\].*")
+                || (normalized.contains("[link]") && normalized.contains("[comments]") && normalized.length() < 120);
     }
 
     private List<String> extractImageUrls(Element entry, String contentHtml) {

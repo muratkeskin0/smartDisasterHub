@@ -231,16 +231,14 @@ public class RedditPostService implements IRedditPostService {
                     post.setImageAnalyzedAt(Instant.now());
                 }
 
-                // Damage analysis remains gated to likely-relevant posts.
-                if (post.getRelevanceScore() != null && post.getRelevanceScore() >= 0.70) {
-                    var damage = openAiVisionMatchService.analyzeImageDamage(post.getMediaUrl());
-                    if (damage != null) {
-                        post.setHasImageDamage((Boolean) damage.get("hasDamage"));
-                        post.setImageDamageSeverity((String) damage.get("damageSeverity"));
-                        post.setImageDamageScore((Double) damage.get("damageScore"));
-                        post.setImageDamageAnalysisJson((String) damage.get("rawJson"));
-                        post.setImageAnalyzedAt(Instant.now());
-                    }
+                // Run damage analysis whenever media exists (not gated by text relevance).
+                var damage = openAiVisionMatchService.analyzeImageDamage(post.getMediaUrl());
+                if (damage != null) {
+                    post.setHasImageDamage((Boolean) damage.get("hasDamage"));
+                    post.setImageDamageSeverity((String) damage.get("damageSeverity"));
+                    post.setImageDamageScore((Double) damage.get("damageScore"));
+                    post.setImageDamageAnalysisJson((String) damage.get("rawJson"));
+                    post.setImageAnalyzedAt(Instant.now());
                 }
             }
 
