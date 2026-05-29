@@ -30,7 +30,7 @@ public class RedditFetchJob {
     @Value("${app.reddit.subreddits:smartDisasterHub}")
     private String subredditsConfig;
 
-    @Value("${app.reddit.posts-per-subreddit:10}")
+    @Value("${app.reddit.posts-per-subreddit:100}")
     private int postsPerSubreddit;
 
     /**
@@ -53,8 +53,9 @@ public class RedditFetchJob {
 
         try {
             if (!integrationSettingsService.isConfigured()) {
-                log.warn("Reddit OAuth is not configured — skipping fetch job. Configure via Admin → Reddit integration.");
-                return;
+                log.warn(
+                        "Reddit OAuth is not configured — fetch will try public JSON, then RSS fallback."
+                );
             }
             if (!integrationSettingsService.isEnabled()) {
                 log.info("Reddit integration is disabled — skipping fetch job");

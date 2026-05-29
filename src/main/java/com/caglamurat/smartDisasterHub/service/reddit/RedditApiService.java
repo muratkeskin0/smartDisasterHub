@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,7 +20,7 @@ import java.util.Objects;
 
 /**
  * Service for fetching posts from Reddit API.
- * Uses OAuth when configured; falls back to public JSON (often blocked with HTTP 403).
+ * Uses OAuth when configured, otherwise public JSON; falls back to RSS on failure.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,6 +29,7 @@ public class RedditApiService implements IRedditApiService {
 
     private final RestTemplate restTemplate;
     private final RedditOAuthTokenProvider oauthTokenProvider;
+    private final RedditRssFeedService redditRssFeedService;
     private final com.caglamurat.smartDisasterHub.service.integration.RedditIntegrationSettingsService integrationSettingsService;
 
     private static final String REDDIT_BASE_URL = "https://www.reddit.com";
@@ -49,15 +49,24 @@ public class RedditApiService implements IRedditApiService {
                 ? String.format("%s/r/%s/new?limit=%d&raw_json=1", REDDIT_OAUTH_BASE_URL, subreddit, actualLimit)
                 : String.format("%s/r/%s/new.json?limit=%d", REDDIT_BASE_URL, subreddit, actualLimit);
 
+        List<RedditApiPost> primaryPosts = fetchPostsViaApi(subreddit, actualLimit, useOAuth, url);
+        if (primaryPosts != null) {
+            return primaryPosts;
+        }
+
+        log.warn("Primary Reddit fetch failed for r/{}; trying RSS fallback", subreddit);
+        return redditRssFeedService.fetchPosts(subreddit, actualLimit);
+    }
+
+    private List<RedditApiPost> fetchPostsViaApi(String subreddit, int limit, boolean useOAuth, String url) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set(HttpHeaders.USER_AGENT, integrationSettingsService.getUserAgent());
             if (useOAuth) {
                 headers.setBearerAuth(oauthTokenProvider.getAccessToken());
             } else {
-                log.warn(
-                        "Reddit OAuth is not configured (app.reddit.client-id/secret/username/password). "
-                                + "Public Reddit JSON endpoints are often blocked with HTTP 403."
+                log.debug(
+                        "Reddit OAuth is not configured; using public JSON endpoint (may return HTTP 403)."
                 );
             }
             HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -72,28 +81,26 @@ public class RedditApiService implements IRedditApiService {
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 List<RedditApiPost> posts = parseRedditResponse(response.getBody());
-                log.info("Successfully fetched {} posts from r/{}", posts.size(), subreddit);
+                log.info("Successfully fetched {} posts from r/{} via Reddit API", posts.size(), subreddit);
                 return posts;
-            } else {
-                log.warn("Reddit API returned non-2xx status: {}", response.getStatusCode());
-                return new ArrayList<>();
             }
 
+            log.warn("Reddit API returned non-2xx status for r/{}: {}", subreddit, response.getStatusCode());
+            return null;
         } catch (RestClientException e) {
             if (!useOAuth) {
-                log.error(
-                        "Error fetching posts from Reddit subreddit r/{} (public API blocked?): {}. "
-                                + "Configure Reddit OAuth credentials in application-secrets-local.properties.",
+                log.warn(
+                        "Reddit API request failed for r/{} (public JSON often blocked): {}",
                         subreddit,
                         e.getMessage()
                 );
             } else {
-                log.error("Error fetching posts from Reddit subreddit r/{}: {}", subreddit, e.getMessage(), e);
+                log.warn("Reddit OAuth API request failed for r/{}: {}", subreddit, e.getMessage());
             }
-            return new ArrayList<>();
+            return null;
         } catch (Exception e) {
-            log.error("Unexpected error fetching posts from Reddit: {}", e.getMessage(), e);
-            return new ArrayList<>();
+            log.error("Unexpected error fetching posts from Reddit API for r/{}: {}", subreddit, e.getMessage(), e);
+            return null;
         }
     }
 
