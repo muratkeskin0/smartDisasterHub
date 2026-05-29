@@ -89,6 +89,14 @@ public class AuthService implements IAuthService {
         User savedUser = userRepository.save(newUser);
         log.info("User registered successfully: {} with ID: {}", savedUser.getEmail(), savedUser.getId());
 
+        if (!emailService.isConfigured()) {
+            log.warn("SMTP not configured — auto-verifying user {} for sign-in without activation email", savedUser.getEmail());
+            savedUser.setIsEmailVerified(true);
+            savedUser = userRepository.save(savedUser);
+            UserDTO userDTO = userMapper.toDTO(savedUser);
+            return new RegisterResponse(true, savedUser.getEmail(), userDTO);
+        }
+
         String verificationToken = UUID.randomUUID().toString();
         EmailVerificationToken emailToken = EmailVerificationToken.builder()
                 .user(savedUser)
