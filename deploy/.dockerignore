@@ -1,0 +1,26 @@
+# Frontend
+smartDisasterHubWeb/node_modules
+smartDisasterHubWeb/dist
+smartDisasterHubWeb/.angular
+
+# Backend
+smartDisasterHub/target
+
+# ML
+ml-service/.venv
+ml-service/inference/services/text_analyzer/models
+ml-service/**/__pycache__
+
+# Git / IDE
+**/.git
+**/.idea
+**/.vscode
+
+# Local secrets
+smartDisasterHub/src/main/resources/application-secrets-local.properties
+smartDisasterHub/src/main/resources/application-mail-local.properties
+smartDisasterHub/src/main/resources/application-openai.properties
+
+# OS
+**/.DS_Store
+**/Thumbs.db

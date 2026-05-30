@@ -1,0 +1,24 @@
+services:
+  smart-disaster-hub:
+    build:
+      context: ../..
+      dockerfile: smartDisasterHub/deploy/Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      APP_WEB_URL: ${APP_WEB_URL:-http://localhost:8080}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sdh_local_pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local_pass}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      MANAGER_PASSWORD: ${MANAGER_PASSWORD:-Manager123!}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      OPENAI_ENABLED: ${OPENAI_ENABLED:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - sdh-mysql:/var/lib/mysql
+      - sdh-ml-models:/app/ml-service/inference/services/text_analyzer/models
+
+volumes:
+  sdh-mysql:
+  sdh-ml-models:

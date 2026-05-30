@@ -1,0 +1,11 @@
+services:
+  smart-disaster-hub:
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_WEB_URL: ${APP_WEB_URL:-https://smartdisasterhub.site}
+      SSL_DOMAIN: ${SSL_DOMAIN:-smartdisasterhub.site}
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
