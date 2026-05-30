@@ -4,7 +4,7 @@ set -euo pipefail
 DOMAIN="${SSL_DOMAIN:-smartdisasterhub.site}"
 EMAIL="${SSL_EMAIL:-smartdisasterhub@gmail.com}"
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
-COMPOSE="-f smartDisasterHub/deploy/docker-compose.yml -f smartDisasterHub/deploy/docker-compose.prod.yml"
+COMPOSE="--env-file ${PROJECT_DIR}/.env -f smartDisasterHub/deploy/docker-compose.yml -f smartDisasterHub/deploy/docker-compose.prod.yml"
 
 log() {
   echo "[init-ssl] $*"

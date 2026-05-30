@@ -3,13 +3,15 @@ services:
     build:
       context: ../..
       dockerfile: smartDisasterHub/deploy/Dockerfile
+    env_file:
+      - ../../.env
     ports:
       - "8080:80"
     environment:
       APP_WEB_URL: ${APP_WEB_URL:-http://localhost:8080}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sdh_local_pass}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local_pass}
-      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me-use-32-chars-minimum!!}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
       MANAGER_PASSWORD: ${MANAGER_PASSWORD:-Manager123!}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}

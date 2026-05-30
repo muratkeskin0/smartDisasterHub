@@ -30,7 +30,7 @@ Single Docker image containing:
 # From workspace root (parent of smartDisasterHub, smartDisasterHubWeb, ml-service):
 cp smartDisasterHub/deploy/.dockerignore .dockerignore
 cp smartDisasterHub/deploy/.env.example .env
-docker compose -f smartDisasterHub/deploy/docker-compose.yml up --build
+docker compose --env-file .env -f smartDisasterHub/deploy/docker-compose.yml up --build
 ```
 
 Open: http://localhost:8080
@@ -77,7 +77,7 @@ cp smartDisasterHub/deploy/.dockerignore .dockerignore
 cp smartDisasterHub/deploy/.env.example .env
 nano .env   # set secrets and APP_WEB_URL
 
-docker compose -f smartDisasterHub/deploy/docker-compose.yml \
+docker compose --env-file .env -f smartDisasterHub/deploy/docker-compose.yml \
                -f smartDisasterHub/deploy/docker-compose.prod.yml \
                up -d --build
 ```
