@@ -24,6 +24,7 @@ import com.caglamurat.smartDisasterHub.service.mail.IEmailTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -135,6 +136,12 @@ public class UserService implements IUserService {
         if (updateDTO.getRoleId() != null) {
             role = IUserRoleRepository.findById(updateDTO.getRoleId())
                     .orElseThrow(() -> ResourceNotFoundException.roleNotFound(updateDTO.getRoleId()));
+            if (role.getName() == UserRoleType.ADMIN) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT,
+                        "Cannot assign ADMIN role via API"
+                );
+            }
         }
 
         // Şifre değişikliği varsa hash'le
@@ -304,8 +311,72 @@ public class UserService implements IUserService {
         User user = IUserRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.userNotFound(id));
 
-        IUserRepository.delete(user);
+        User current = securityUserContext.requireCurrentUser();
+        if (user.getId().equals(current.getId())) {
+            throw new BusinessException(
+                    ErrorCode.USER_DELETE_SELF,
+                    "You cannot delete your own account"
+            );
+        }
+
+        if (user.getRole().getName() == UserRoleType.ADMIN) {
+            throw new BusinessException(
+                    ErrorCode.USER_DELETE_PROTECTED,
+                    "Admin accounts cannot be deleted"
+            );
+        }
+
+        emailVerificationTokenRepository.deleteByUser(user);
+
+        try {
+            IUserRepository.delete(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(
+                    ErrorCode.USER_IN_USE,
+                    "User has related records and cannot be deleted"
+            );
+        }
+
         log.info("User hard deleted successfully: {}", id);
+    }
+
+    @Override
+    public void resendActivationEmail(Long id) {
+        log.info("Resending activation email for user ID: {}", id);
+
+        User user = IUserRepository.findById(id)
+                .orElseThrow(() -> ResourceNotFoundException.userNotFound(id));
+
+        if (Boolean.TRUE.equals(user.getIsEmailVerified())) {
+            throw new BusinessException(
+                    ErrorCode.USER_ALREADY_VERIFIED,
+                    "User email is already verified"
+            );
+        }
+
+        if (!emailService.isConfigured()) {
+            user.setIsEmailVerified(true);
+            IUserRepository.save(user);
+            log.warn("SMTP not configured — auto-verifying user {} without activation email", user.getEmail());
+            return;
+        }
+
+        emailVerificationTokenRepository.deleteByUserAndPurpose(user, EmailVerificationPurpose.ACCOUNT_ACTIVATION);
+
+        String verificationToken = UUID.randomUUID().toString();
+        EmailVerificationToken emailToken = EmailVerificationToken.builder()
+                .user(user)
+                .token(verificationToken)
+                .purpose(EmailVerificationPurpose.ACCOUNT_ACTIVATION)
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .build();
+        emailVerificationTokenRepository.save(emailToken);
+
+        String activationLink = webUrl + "/activate-email?token=" + verificationToken;
+        String fullName = user.getFirstName() + " " + user.getLastName();
+        String emailBody = emailTemplateService.buildActivationEmail(fullName, activationLink);
+        emailService.sendHtmlEmail(user.getEmail(), "Activate your Smart Disaster Hub account", emailBody);
+        log.info("Activation email resent to {}", user.getEmail());
     }
 
     @Override

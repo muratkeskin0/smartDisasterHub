@@ -48,5 +48,7 @@ public interface IUserService {
 
     UserDTO changeUserRole(Long userId, Long roleId);
 
+    void resendActivationEmail(Long id);
+
 }
 

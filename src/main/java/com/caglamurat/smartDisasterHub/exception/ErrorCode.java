@@ -97,6 +97,34 @@ public enum ErrorCode {
             ErrorCategory.USER,
             ErrorSeverity.HIGH
     ),
+    USER_DELETE_SELF(
+            "USER_008",
+            "You cannot delete your own account",
+            HttpStatus.BAD_REQUEST,
+            ErrorCategory.USER,
+            ErrorSeverity.MEDIUM
+    ),
+    USER_DELETE_PROTECTED(
+            "USER_009",
+            "This account cannot be deleted",
+            HttpStatus.BAD_REQUEST,
+            ErrorCategory.USER,
+            ErrorSeverity.MEDIUM
+    ),
+    USER_IN_USE(
+            "USER_010",
+            "User has related records and cannot be deleted",
+            HttpStatus.CONFLICT,
+            ErrorCategory.USER,
+            ErrorSeverity.MEDIUM
+    ),
+    USER_ALREADY_VERIFIED(
+            "USER_011",
+            "User email is already verified",
+            HttpStatus.BAD_REQUEST,
+            ErrorCategory.USER,
+            ErrorSeverity.LOW
+    ),
     
     // ===========================
     // ROLE ERRORS (ROLE_XXX)

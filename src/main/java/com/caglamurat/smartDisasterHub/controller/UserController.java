@@ -113,6 +113,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("User deleted successfully"));
     }
 
+    @PostMapping("/{id}/resend-activation")
+    public ResponseEntity<ApiResponse<Void>> resendActivationEmail(@PathVariable Long id) {
+        log.info("REST request to resend activation email for user ID: {}", id);
+        _userService.resendActivationEmail(id);
+        return ResponseEntity.ok(ApiResponse.success("Activation email sent"));
+    }
+
     @GetMapping("/exists/email/{email}")
     public ResponseEntity<ApiResponse<Boolean>> checkEmailExists(@PathVariable String email) {
         log.debug("REST request to check if email exists: {}", email);
