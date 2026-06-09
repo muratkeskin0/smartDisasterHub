@@ -4,10 +4,12 @@ import com.caglamurat.smartDisasterHub.config.JwtUtil;
 import com.caglamurat.smartDisasterHub.domain.EmailVerificationToken;
 import com.caglamurat.smartDisasterHub.domain.User;
 import com.caglamurat.smartDisasterHub.domain.UserRole;
+import com.caglamurat.smartDisasterHub.dto.auth.ForgotPasswordRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.LoginRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.LoginResponse;
 import com.caglamurat.smartDisasterHub.dto.auth.RegisterRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.RegisterResponse;
+import com.caglamurat.smartDisasterHub.dto.auth.ResetPasswordRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.VerifyTokenResponse;
 import com.caglamurat.smartDisasterHub.dto.user.UserDTO;
 import com.caglamurat.smartDisasterHub.enums.EmailVerificationPurpose;
@@ -264,6 +266,102 @@ public class AuthService implements IAuthService {
         verificationToken.setUsedAt(Instant.now());
         emailVerificationTokenRepository.save(verificationToken);
         return successMessage;
+    }
+
+    @Override
+    @Transactional
+    public String forgotPassword(ForgotPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+        log.info("Password reset requested for email: {}", email);
+
+        if (!emailService.isConfigured()) {
+            throw new BusinessException(
+                    ErrorCode.EMAIL_DELIVERY_FAILED,
+                    "Email delivery is not configured. Please contact support."
+            );
+        }
+
+        userRepository.findByEmail(email).ifPresent(user -> {
+            emailVerificationTokenRepository.deleteByUserAndPurpose(user, EmailVerificationPurpose.PASSWORD_RESET);
+
+            String tokenValue = UUID.randomUUID().toString();
+            EmailVerificationToken resetToken = EmailVerificationToken.builder()
+                    .user(user)
+                    .token(tokenValue)
+                    .purpose(EmailVerificationPurpose.PASSWORD_RESET)
+                    .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                    .build();
+            emailVerificationTokenRepository.save(resetToken);
+
+            String resetLink = webUrl + "/reset-password?token=" + tokenValue;
+            String fullName = user.getFirstName() + " " + user.getLastName();
+            String emailBody = emailTemplateService.buildPasswordResetEmail(fullName, resetLink);
+            emailService.sendHtmlEmail(user.getEmail(), "Reset your Smart Disaster Hub password", emailBody);
+            log.info("Password reset email sent to {}", user.getEmail());
+        });
+
+        return "If an account exists for this email, a password reset link has been sent.";
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void validatePasswordResetToken(String token) {
+        findValidPasswordResetToken(token);
+    }
+
+    @Override
+    @Transactional
+    public String resetPassword(ResetPasswordRequest request) {
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Password and confirm password do not match"
+            );
+        }
+
+        EmailVerificationToken resetToken = findValidPasswordResetToken(request.getToken());
+        User user = resetToken.getUser();
+
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        userRepository.save(user);
+
+        resetToken.setUsedAt(Instant.now());
+        emailVerificationTokenRepository.save(resetToken);
+        emailVerificationTokenRepository.deleteByUserAndPurpose(user, EmailVerificationPurpose.PASSWORD_RESET);
+
+        log.info("Password reset completed for user {}", user.getEmail());
+        return "Your password has been updated. You can now sign in.";
+    }
+
+    private EmailVerificationToken findValidPasswordResetToken(String token) {
+        EmailVerificationToken resetToken = emailVerificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID,
+                        "Password reset link is invalid"
+                ));
+
+        if (resetToken.getPurpose() != EmailVerificationPurpose.PASSWORD_RESET) {
+            throw new BusinessException(
+                    ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID,
+                    "Password reset link is invalid"
+            );
+        }
+
+        if (resetToken.isUsed()) {
+            throw new BusinessException(
+                    ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID,
+                    "Password reset link has already been used"
+            );
+        }
+
+        if (resetToken.isExpired()) {
+            throw new BusinessException(
+                    ErrorCode.EMAIL_VERIFICATION_TOKEN_EXPIRED,
+                    "Password reset link has expired"
+            );
+        }
+
+        return resetToken;
     }
 }
 

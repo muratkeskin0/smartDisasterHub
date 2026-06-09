@@ -1,10 +1,12 @@
 package com.caglamurat.smartDisasterHub.controller;
 
 import com.caglamurat.smartDisasterHub.dto.ApiResponse;
+import com.caglamurat.smartDisasterHub.dto.auth.ForgotPasswordRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.LoginRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.LoginResponse;
 import com.caglamurat.smartDisasterHub.dto.auth.RegisterRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.RegisterResponse;
+import com.caglamurat.smartDisasterHub.dto.auth.ResetPasswordRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.VerifyTokenResponse;
 import com.caglamurat.smartDisasterHub.service.auth.IAuthService;
 import jakarta.validation.Valid;
@@ -105,6 +107,27 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> activateEmail(@RequestParam("token") String token) {
         log.info("REST request to activate email");
         String message = authService.activateEmail(token);
+        return ResponseEntity.ok(ApiResponse.success(message));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("REST request to forgot password for email: {}", request.getEmail());
+        String message = authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(message));
+    }
+
+    @GetMapping("/reset-password/validate")
+    public ResponseEntity<ApiResponse<Void>> validateResetPasswordToken(@RequestParam("token") String token) {
+        log.debug("REST request to validate password reset token");
+        authService.validatePasswordResetToken(token);
+        return ResponseEntity.ok(ApiResponse.success("Password reset link is valid"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("REST request to reset password");
+        String message = authService.resetPassword(request);
         return ResponseEntity.ok(ApiResponse.success(message));
     }
 }

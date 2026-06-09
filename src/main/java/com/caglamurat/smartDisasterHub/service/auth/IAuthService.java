@@ -1,9 +1,11 @@
 package com.caglamurat.smartDisasterHub.service.auth;
 
+import com.caglamurat.smartDisasterHub.dto.auth.ForgotPasswordRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.LoginRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.LoginResponse;
 import com.caglamurat.smartDisasterHub.dto.auth.RegisterRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.RegisterResponse;
+import com.caglamurat.smartDisasterHub.dto.auth.ResetPasswordRequest;
 import com.caglamurat.smartDisasterHub.dto.auth.VerifyTokenResponse;
 
 /**
@@ -46,5 +48,11 @@ public interface IAuthService {
      * @return user-facing success message (account activation vs email change)
      */
     String activateEmail(String token);
+
+    String forgotPassword(ForgotPasswordRequest request);
+
+    void validatePasswordResetToken(String token);
+
+    String resetPassword(ResetPasswordRequest request);
 }
 
