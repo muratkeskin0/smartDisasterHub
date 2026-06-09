@@ -281,26 +281,30 @@ public class AuthService implements IAuthService {
             );
         }
 
-        userRepository.findByEmail(email).ifPresent(user -> {
-            emailVerificationTokenRepository.deleteByUserAndPurpose(user, EmailVerificationPurpose.PASSWORD_RESET);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.USER_NOT_FOUND,
+                        "No account found with this email address"
+                ));
 
-            String tokenValue = UUID.randomUUID().toString();
-            EmailVerificationToken resetToken = EmailVerificationToken.builder()
-                    .user(user)
-                    .token(tokenValue)
-                    .purpose(EmailVerificationPurpose.PASSWORD_RESET)
-                    .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
-                    .build();
-            emailVerificationTokenRepository.save(resetToken);
+        emailVerificationTokenRepository.deleteByUserAndPurpose(user, EmailVerificationPurpose.PASSWORD_RESET);
 
-            String resetLink = webUrl + "/reset-password?token=" + tokenValue;
-            String fullName = user.getFirstName() + " " + user.getLastName();
-            String emailBody = emailTemplateService.buildPasswordResetEmail(fullName, resetLink);
-            emailService.sendHtmlEmail(user.getEmail(), "Reset your Smart Disaster Hub password", emailBody);
-            log.info("Password reset email sent to {}", user.getEmail());
-        });
+        String tokenValue = UUID.randomUUID().toString();
+        EmailVerificationToken resetToken = EmailVerificationToken.builder()
+                .user(user)
+                .token(tokenValue)
+                .purpose(EmailVerificationPurpose.PASSWORD_RESET)
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        emailVerificationTokenRepository.save(resetToken);
 
-        return "If an account exists for this email, a password reset link has been sent.";
+        String resetLink = webUrl + "/reset-password?token=" + tokenValue;
+        String fullName = user.getFirstName() + " " + user.getLastName();
+        String emailBody = emailTemplateService.buildPasswordResetEmail(fullName, resetLink);
+        emailService.sendHtmlEmail(user.getEmail(), "Reset your Smart Disaster Hub password", emailBody);
+        log.info("Password reset email sent to {}", user.getEmail());
+
+        return "Password reset link sent to your email.";
     }
 
     @Override
